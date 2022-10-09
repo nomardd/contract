@@ -15,14 +15,15 @@ contract Nomard {
     ERC20Interface stableCoinContract;
     event NewTrip(uint tripId, address user, string tripName, uint totalNeeded);
     event NewFundTrip(uint trip, uint amount, address user);
-    event NewWithdralRequest(uint trip, uint amount, address user);
+    event NewWithdralRequest(uint withdrawId, uint trip, uint amount, address user);
+    event NewWithdrawDone(uint withdrawId, uint amount, address user);
     event NewAddTripMembers(uint trip, address user);
 
     //DATA STUCTURES
     //all trips
 
     mapping( uint => Trip) _trips;
-    WithdrawRequest[] _wR;
+    mapping( uint => WithdrawRequest) _withdrawRequests;
     //address gnosisWallet;
     uint lastId;
     uint lastWithdrawId;
@@ -31,8 +32,10 @@ contract Nomard {
         uint id;
         string tripName;
         mapping(address => uint)  balance;
+        uint[] withdrawRequests;
         address[]  members;
         uint totalNeeded;
+        uint totalExpend;
         bool active;
         address owner;
     }     
@@ -41,6 +44,7 @@ contract Nomard {
         uint withdrawId;
         uint tripId;
         uint amount;
+        string receipt;
         bool done;
         address[] addressApprovals;
     } 
@@ -62,11 +66,8 @@ contract Nomard {
    function createTrip (address user, string memory tripName, uint totalNeeded) public  {
         //create trip
          
-
         //other needed assignments
         _users[user].userTrips.push(lastId);
-
-
 
 
         _trips[lastId].id = lastId;
@@ -74,9 +75,9 @@ contract Nomard {
         _trips[lastId].members.push(user);
         _trips[lastId].totalNeeded = totalNeeded;
         _trips[lastId].active = true;
+        _trips[lastId].totalExpend = 0;
         //assign user
         _trips[lastId].owner = user;
-
 
         emit NewTrip(lastId,  user,  tripName, totalNeeded);
         lastId += 1;
@@ -84,8 +85,9 @@ contract Nomard {
     
     
 
-   function deleteTrip(uint id) public returns (bool){
-        _trips[lastId].active = false;
+   function deleteTrip(uint id) public returns (bool) {
+      _trips[id].active = false;
+      return true;
    }
 
   
@@ -107,21 +109,52 @@ contract Nomard {
         emit NewFundTrip(lastId,  amount,  user);
         return true;
    }
-/*
-   function withdrawRequest(uint amount, uint tripId, address user) public returns (bool){
-        WithdrawRequest storage wR = new WithdrawRequest();       
-        wR.withdrawId = lastWithdrawId+1;
-        wR.amount = amount;
-        wR.done = false;
-        wR.tripId = tripId;
 
-        lastWithdrawId = _wR.withdrawId;
-
-        _wR.push(wR);
-        emit NewWithdralRequest(lastId,  tripId,  amount, user);
-
-        return true;
+   function withdrawRequest(uint amount, uint tripId, address user, string memory receipt) public returns (uint) {
+     _withdrawRequests[lastWithdrawId].withdrawId = lastWithdrawId;
+     _withdrawRequests[lastWithdrawId].amount = amount;
+     _withdrawRequests[lastWithdrawId].done = false;
+     _withdrawRequests[lastWithdrawId].tripId = tripId;
+     _withdrawRequests[lastWithdrawId].receipt = receipt;
+     emit NewWithdralRequest(lastWithdrawId,  tripId,  amount, user);
+     lastWithdrawId+=1; 
+     return (lastWithdrawId-1);
    }
+
+  function addressAlreadyApproved(address theAddress, uint tripId) public view returns (bool){
+    for(uint index = 0; index < _trips[tripId].members.length; index++) {
+      if(_trips[tripId].members[index] == theAddress) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+   function approveWithdraw(uint withdrawId) public {
+    if(!addressAlreadyApproved(msg.sender, _withdrawRequests[withdrawId].tripId)) {
+      _withdrawRequests[withdrawId].addressApprovals.push(msg.sender);
+    }
+   }
+
+   function withdrawMoney(uint withdrawRequestId) public  {
+    uint actualTripId=_withdrawRequests[withdrawRequestId].tripId;
+    // if it's not done and atleast half approvals
+    if(!_withdrawRequests[withdrawRequestId].done && _trips[actualTripId].members.length > 0 && _withdrawRequests[lastWithdrawId].addressApprovals.length>=_trips[actualTripId].members.length/2 ) {
+       (bool os, ) = payable(msg.sender).call{value: _withdrawRequests[lastWithdrawId].amount}('');
+       emit NewWithdrawDone(withdrawRequestId, _withdrawRequests[lastWithdrawId].amount, msg.sender);
+      _withdrawRequests[lastWithdrawId].done = true;
+      _trips[_withdrawRequests[lastWithdrawId].tripId].withdrawRequests.push(lastWithdrawId);
+      _trips[_withdrawRequests[lastWithdrawId].tripId].totalExpend+=_withdrawRequests[lastWithdrawId].amount;
+       require(os);
+    }
+   }
+
+   function getAvailableMoneyInTrip(uint tripId) public view returns (uint) {
+    return _trips[tripId].totalNeeded - _trips[tripId].totalExpend; 
+   }
+
+
+/*
 
    function withdraw(uint trip) public returns (bool){
 
