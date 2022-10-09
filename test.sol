@@ -151,10 +151,10 @@ contract Nomard {
   }
 
    function approveWithdraw(uint withdrawId) public {
-    if(!addressAlreadyApproved(msg.sender, _withdrawRequests[withdrawId].tripId)) {
+    // if(!addressAlreadyApproved(msg.sender, _withdrawRequests[withdrawId].tripId)) {
       _withdrawRequests[withdrawId].addressApprovals.push(msg.sender);
       emit UserApprovedWithdraw(msg.sender, withdrawId);
-    }
+    // }
    }
 
    function withdrawMoney(uint withdrawRequestId) public  {
