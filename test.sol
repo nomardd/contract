@@ -18,6 +18,8 @@ contract Nomard {
     event NewWithdralRequest(uint withdrawId, uint trip, uint amount, address user);
     event NewWithdrawDone(uint withdrawId, uint amount, address user);
     event NewAddTripMembers(uint trip, address user);
+    event UserApprovedWithdraw(address user, uint withdrawId);
+    event DeleteTrip(uint tripId);
 
     //DATA STUCTURES
     //all trips
@@ -87,6 +89,7 @@ contract Nomard {
 
    function deleteTrip(uint id) public returns (bool) {
       _trips[id].active = false;
+      emit DeleteTrip(id);
       return true;
    }
 
@@ -133,6 +136,7 @@ contract Nomard {
    function approveWithdraw(uint withdrawId) public {
     if(!addressAlreadyApproved(msg.sender, _withdrawRequests[withdrawId].tripId)) {
       _withdrawRequests[withdrawId].addressApprovals.push(msg.sender);
+      emit UserApprovedWithdraw(msg.sender, withdrawId);
     }
    }
 
@@ -152,18 +156,5 @@ contract Nomard {
    function getAvailableMoneyInTrip(uint tripId) public view returns (uint) {
     return _trips[tripId].totalNeeded - _trips[tripId].totalExpend; 
    }
-
-
-/*
-
-   function withdraw(uint trip) public returns (bool){
-
-    return false;
-   
-                
-   }
-*/
-
-
 }
 
