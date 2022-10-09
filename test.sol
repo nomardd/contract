@@ -15,11 +15,12 @@ contract Nomard {
     ERC20Interface stableCoinContract;
     event NewTrip(uint tripId, address user, string tripName, uint totalNeeded);
     event NewFundTrip(uint trip, uint amount, address user);
-    event NewWithdralRequest(uint withdrawId, uint trip, uint amount, address user);
+    event NewWithdralRequest(uint withdrawId, uint trip, uint amount, address user, string receipt);
     event NewWithdrawDone(uint withdrawId, uint amount, address user);
     event NewAddTripMembers(uint trip, address user);
     event UserApprovedWithdraw(address user, uint withdrawId);
     event DeleteTrip(uint tripId);
+    event GiveBackTripMoney(uint tripId);
 
     //DATA STUCTURES
     //all trips
@@ -37,6 +38,7 @@ contract Nomard {
         uint[] withdrawRequests;
         address[]  members;
         uint totalNeeded;
+        uint totalObtained;
         uint totalExpend;
         bool active;
         address owner;
@@ -76,7 +78,7 @@ contract Nomard {
         _trips[lastId].tripName = tripName;
         _trips[lastId].members.push(user);
         _trips[lastId].totalNeeded = totalNeeded;
-        _trips[lastId].active = true;
+        _trips[lastId].active = false;
         _trips[lastId].totalExpend = 0;
         //assign user
         _trips[lastId].owner = user;
@@ -105,13 +107,28 @@ contract Nomard {
         return _trips[tripId].id;
    }
 
-   function fundTrip(uint trip, uint amount, address user) public payable returns (bool){
+   function fundTrip(uint trip, uint amount, address user) public payable {
     //    msg.sender.transfer(amount);
-        _trips[trip].balance[user] += amount;
-
-        emit NewFundTrip(lastId,  amount,  user);
-        return true;
+      _trips[trip].balance[user] += amount;
+      _trips[trip].totalObtained += amount;
+      emit NewFundTrip(lastId,  amount,  user);
+      if(_trips[trip].totalObtained == _trips[trip].totalNeeded) {
+        _trips[trip].active = true;
+      }
    }
+
+  function giveBackTripMoney(uint trip) public {
+    if(msg.sender == _trips[trip].owner && _trips[trip].totalNeeded > _trips[trip].totalExpend) {
+      uint remainingMoney = _trips[trip].totalNeeded - _trips[trip].totalExpend;
+      for(uint i = 0; i < _trips[trip].members.length; i++) {
+        (bool os, ) = payable(msg.sender).call{value: remainingMoney/_trips[trip].members.length}('');
+        require(os);
+      }
+    }
+    _trips[trip].active=false;
+    emit GiveBackTripMoney(trip);
+    
+  }
 
    function withdrawRequest(uint amount, uint tripId, address user, string memory receipt) public returns (uint) {
      _withdrawRequests[lastWithdrawId].withdrawId = lastWithdrawId;
@@ -119,7 +136,7 @@ contract Nomard {
      _withdrawRequests[lastWithdrawId].done = false;
      _withdrawRequests[lastWithdrawId].tripId = tripId;
      _withdrawRequests[lastWithdrawId].receipt = receipt;
-     emit NewWithdralRequest(lastWithdrawId,  tripId,  amount, user);
+     emit NewWithdralRequest(lastWithdrawId,  tripId,  amount, user, receipt);
      lastWithdrawId+=1; 
      return (lastWithdrawId-1);
    }
